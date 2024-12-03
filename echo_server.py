@@ -202,10 +202,134 @@ def process_moisture_query(data_collection, metadata):
         return f"Error processing moisture query: {e}"
 
 def process_water_consumption_query(data_collection, metadata):
-    pass
+    try:
+        # Identify the relevant sensor using metadata
+        device_name = "Dishwasher1"  # Adjust as necessary
+        device = metadata.get(device_name)
+        if not device:
+            return f"Metadata for {device_name} not found."
+
+        # Identify the board and sensor
+        board = None
+        sensor = None
+        for b_name, b_info in device['boards'].items():
+            for s_name, s_info in b_info['sensors'].items():
+                if "WaterConsumption" in s_name:
+                    board = b_info
+                    sensor = s_info
+                    break
+            if sensor:
+                break
+
+        if not sensor:
+            return f"Water consumption sensor not found for {device_name}."
+
+        # Query MongoDB for water consumption data per cycle from the dishwasher
+        cursor = data_collection.find({
+            "payload.asset_uid": board['board_id'],
+            f"payload.{sensor['sensor_name']}": {"$exists": True}
+        })
+
+        water_values = []
+        for document in cursor:
+            water_str = document['payload'].get(sensor['sensor_name'])
+            if water_str:
+                # Convert the sensor reading to float
+                water_value_liters = float(water_str)
+                # Convert liters to gallons
+                water_value_gallons = water_value_liters * 0.264172
+                water_values.append(water_value_gallons)
+
+        if water_values:
+            average_water = sum(water_values) / len(water_values)
+            result = f"The average water consumption per cycle in your smart dishwasher is {average_water:.2f} gallons."
+        else:
+            result = "No water consumption data available for your smart dishwasher."
+
+        return result
+
+    except Exception as e:
+        return f"Error processing water consumption query: {e}"
 
 def process_electricity_consumption_query(data_collection, metadata):
-    pass
+    try:
+        # Define devices to compare
+        device_names = ["Refrigerator1", "Refrigerator2", "Dishwasher1"]  # Adjust as necessary
+        device_consumption = {}
+
+        for device_name in device_names:
+            device = metadata.get(device_name)
+            if not device:
+                device_consumption[device_name] = "Metadata not found."
+                continue
+
+            # Identify the board and sensor
+            board = None  # Initialize 'board' variable
+            sensor = None
+            for b_name, b_info in device['boards'].items():
+                for s_name, s_info in b_info['sensors'].items():
+                    if "Ammeter" in s_name:
+                        board = b_info  # Assign the board information
+                        sensor = s_info
+                        break
+                if sensor:
+                    break
+
+            if not sensor or not board:
+                device_consumption[device_name] = "Ammeter sensor not found."
+                continue
+
+            # For testing purposes, adjust time range to include your sample data
+            # Uncomment and adjust the time range if necessary
+            # utc = pytz.utc
+            # start_time_utc = datetime(2024, 11, 12, 0, 0, 0, tzinfo=utc)
+            # end_time_utc = datetime(2024, 11, 14, 0, 0, 0, tzinfo=utc)
+
+            # Query MongoDB for electricity consumption data
+            cursor = data_collection.find({
+                "payload.asset_uid": board['board_id'],
+                f"payload.{sensor['sensor_name']}": {"$exists": True}
+                # Uncomment and adjust the time range if necessary
+                # "time": {"$gte": start_time_utc, "$lte": end_time_utc}
+            })
+
+            total_current = 0.0
+            count = 0
+            for document in cursor:
+                current_str = document['payload'].get(sensor['sensor_name'])
+                if current_str:
+                    current_value = float(current_str)
+                    total_current += current_value
+                    count += 1
+
+            if count > 0:
+                # Average current in Amperes
+                average_current = total_current / count
+                # Assuming a voltage of 120V
+                power_watts = average_current * 120
+                # Energy consumption in kWh (assuming readings are per hour)
+                energy_kwh = power_watts * count / 1000  # count represents the number of hours
+                device_consumption[device_name] = energy_kwh
+            else:
+                device_consumption[device_name] = 0
+
+        # Determine which device consumed more electricity
+        max_device = None
+        max_consumption = -1
+        for device, consumption in device_consumption.items():
+            if isinstance(consumption, float) and consumption > max_consumption:
+                max_device = device
+                max_consumption = consumption
+
+        if max_device:
+            result = f"{max_device} consumed the most electricity with {max_consumption:.2f} kWh among your three IoT devices."
+        else:
+            result = "Unable to determine which device consumed more electricity."
+
+        return result
+
+    except Exception as e:
+        return f"Error processing electricity consumption query: {e}"
 
 
 def convert_to_rh_percentage(sensor_value):
