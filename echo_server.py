@@ -1,5 +1,7 @@
 import socket
-
+import mysql.connector
+from datetime import datetime
+import pytz
 def main():
     running = True
     while running:
