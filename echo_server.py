@@ -11,8 +11,6 @@ def main():
         try:
             serverIp = input("Enter server IP address to bind (e.g., 0.0.0.0): ")
             serverPort = int(input("Enter server port number: "))
-            serverIp = "0.0.0.0"
-            serverPort = 14432
             running = False  # Exit loop if inputs are valid
         except ValueError:
             print("Invalid port number. Please enter a numeric value for the port.")
