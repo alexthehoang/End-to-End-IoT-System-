@@ -1,4 +1,4 @@
-# End-to-End-IoT-System-
+# End-to-End-IoT-System- Group 27 Alexander Hoang and Diego Perez
 In this assignment, you will build a complete end-to-end IoT system 
 
 1. Prerequisites:
